@@ -63,20 +63,20 @@ jobs:
         run: |
           mv flclash-temp.yaml flclash.yaml
 
-            - name: 记录更新时间和订阅地址
+      - name: 记录更新时间和来源链接
         env:
           SUBSCRIPTION_URL: ${{ inputs.subscription_url }}
         run: |
           UPDATE_TIME=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')
 
-          cat > update-info.txt << EOF
-          FlClash 节点更新记录
-
-          最新更新时间：$UPDATE_TIME
-          时区：北京时间
-          本次来源链接：$SUBSCRIPTION_URL
-          固定订阅地址：https://raw.githubusercontent.com/50lovelace/flclash-nodes/main/flclash.yaml
-          EOF
+          {
+            echo "FlClash 节点更新记录"
+            echo ""
+            echo "最新更新时间：$UPDATE_TIME"
+            echo "时区：北京时间"
+            echo "本次来源链接：$SUBSCRIPTION_URL"
+            echo "固定订阅地址：https://raw.githubusercontent.com/50lovelace/flclash-nodes/main/flclash.yaml"
+          } > update-info.txt
 
       - name: 提交到仓库
         run: |
