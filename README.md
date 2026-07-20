@@ -8,7 +8,6 @@ FlClash 中长期使用下面这个链接：
 
 ```text
 https://raw.githubusercontent.com/50lovelace/flclash-nodes/main/flclash.yaml
-
 只要仓库名称、分支名称和文件名称不变，这个订阅地址就不需要修改。
 
 每日更新方法
@@ -19,13 +18,11 @@ https://raw.githubusercontent.com/50lovelace/flclash-nodes/main/flclash.yaml
 再点击绿色的 Run workflow
 等待运行状态变成绿色对勾
 回到 FlClash 点击更新配置
-
-系统会自动：
-
+系统会自动完成
 下载当天的 Clash 配置
 检查配置内容
 覆盖 flclash.yaml
-记录更新时间
+记录更新时间和来源链接
 提交到仓库
 文件说明
 flclash.yaml：FlClash 实际读取的配置文件
