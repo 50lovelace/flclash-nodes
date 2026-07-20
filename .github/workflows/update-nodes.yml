@@ -1,0 +1,78 @@
+name: 更新 FlClash 节点
+
+on:
+  workflow_dispatch:
+    inputs:
+      subscription_url:
+        description: "粘贴当天的 Clash 订阅链接"
+        required: true
+        default: "https://shz.al/fyxm"
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 获取仓库内容
+        uses: actions/checkout@v4
+
+      - name: 下载当天 Clash 配置
+        env:
+          SUBSCRIPTION_URL: ${{ inputs.subscription_url }}
+        run: |
+          echo "正在下载当天配置"
+
+          curl \
+            --location \
+            --fail \
+            --silent \
+            --show-error \
+            --retry 3 \
+            --connect-timeout 20 \
+            --max-time 180 \
+            --user-agent "Mozilla/5.0" \
+            "$SUBSCRIPTION_URL" \
+            --output flclash-temp.yaml
+
+      - name: 检查下载结果
+        run: |
+          if [ ! -s flclash-temp.yaml ]; then
+            echo "下载失败：文件为空"
+            exit 1
+          fi
+
+          FILE_SIZE=$(wc -c < flclash-temp.yaml)
+          echo "下载文件大小：$FILE_SIZE 字节"
+
+          if [ "$FILE_SIZE" -lt 100 ]; then
+            echo "下载失败：文件内容过少"
+            exit 1
+          fi
+
+          if ! grep -qE '^[[:space:]]*(proxies|proxy-providers):' flclash-temp.yaml; then
+            echo "下载内容可能不是 Clash 配置"
+            head -n 20 flclash-temp.yaml
+            exit 1
+          fi
+
+      - name: 更新固定配置文件
+        run: |
+          mv flclash-temp.yaml flclash.yaml
+
+      - name: 提交到仓库
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add flclash.yaml
+
+          if git diff --cached --quiet; then
+            echo "配置没有变化，无需提交"
+          else
+            git commit -m "更新 FlClash 免费节点"
+            git push
+          fi
