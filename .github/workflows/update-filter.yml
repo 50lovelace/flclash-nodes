@@ -27,13 +27,14 @@ jobs:
         pip install pyyaml
 
 
-    - name: 复制原始节点
+    - name: 下载最新JC节点
       run: |
-        cp flclash.yaml flclash-original.yaml
+        curl -L "https://shz.al/fyxm" -o flclash-original.yaml
 
 
-    - name: 执行节点过滤
+    - name: 生成过滤节点
       run: |
+        cp flclash-original.yaml flclash.yaml
         python filter.py
 
 
