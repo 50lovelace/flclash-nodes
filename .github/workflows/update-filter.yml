@@ -2,6 +2,10 @@ name: 美国节点过滤
 
 on:
   workflow_dispatch:
+    inputs:
+      test:
+        description: "手动运行过滤"
+        required: false
 
 permissions:
   contents: write
