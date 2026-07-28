@@ -1,1 +1,55 @@
+name: 美国节点过滤
 
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  filter:
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: 获取仓库内容
+      uses: actions/checkout@v4
+
+
+    - name: 安装 Python 环境
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.x"
+
+
+    - name: 安装依赖
+      run: |
+        pip install pyyaml
+
+
+    - name: 复制原始节点
+      run: |
+        cp flclash.yaml flclash-original.yaml
+
+
+    - name: 执行节点过滤
+      run: |
+        python filter.py
+
+
+    - name: 记录更新时间
+      run: |
+        echo "美国节点过滤完成" > update-info.txt
+        date >> update-info.txt
+
+
+    - name: 提交更新
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+        git add .
+
+        git commit -m "更新美国节点过滤结果" || exit 0
+
+        git push
