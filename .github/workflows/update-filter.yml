@@ -12,45 +12,42 @@ jobs:
 
     steps:
 
-    - name: 获取仓库内容
-      uses: actions/checkout@v4
+      - name: 获取代码
+        uses: actions/checkout@v4
 
 
-    - name: 安装 Python 环境
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.x"
+      - name: 安装Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
 
 
-    - name: 安装依赖
-      run: |
-        pip install pyyaml
+      - name: 安装依赖
+        run: |
+          pip install pyyaml
 
 
-    - name: 下载最新JC节点
-      run: |
-        curl -L "https://shz.al/fyxm" -o flclash-original.yaml
+      - name: 下载JC最新节点
+        run: |
+          curl -L "https://shz.al/fyxm" -o flclash-original.yaml
 
 
-    - name: 生成过滤节点
-      run: |
-        cp flclash-original.yaml flclash.yaml
-        python filter.py
+      - name: 执行美国节点过滤
+        run: |
+          cp flclash-original.yaml flclash.yaml
+          python filter.py
 
 
-    - name: 记录更新时间
-      run: |
-        echo "美国节点过滤完成" > update-info.txt
-        date >> update-info.txt
+      - name: 更新说明
+        run: |
+          echo "美国节点过滤完成" > update-info.txt
+          date >> update-info.txt
 
 
-    - name: 提交更新
-      run: |
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-        git add .
-
-        git commit -m "更新美国节点过滤结果" || exit 0
-
-        git push
+      - name: 提交结果
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "更新美国过滤节点" || exit 0
+          git push
