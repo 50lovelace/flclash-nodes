@@ -1,6 +1,6 @@
 FlClash 节点更新记录
 
-最新更新时间：2026-09-28 12:36:44
+最新更新时间：2026-09-30 18:25:37
 时区：北京时间
-本次来源链接：https://shz.al/7Sca
+本次来源链接：https://shz.al/c5sd
 固定订阅地址：https://raw.githubusercontent.com/50lovelace/flclash-nodes/main/flclash.yaml
