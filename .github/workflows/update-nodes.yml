@@ -20,6 +20,16 @@ jobs:
       - name: 获取仓库内容
         uses: actions/checkout@v4
 
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装 YAML 检查工具
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
       - name: 下载当天 Clash 配置
         env:
           SUBSCRIPTION_URL: ${{ inputs.subscription_url }}
@@ -59,6 +69,281 @@ jobs:
             exit 1
           fi
 
+      - name: 清理控制字符并校验 YAML
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import yaml
+          import sys
+          import unicodedata
+
+          src = Path("flclash-temp.yaml")
+          cleaned_file = Path("flclash-temp-clean.yaml")
+
+          print("开始检查 Clash YAML...")
+
+          # -------------------------------------------------
+          # 控制字符判断
+          # 保留 YAML 正常使用的 TAB、换行、回车
+          # 删除 C0、DEL、C1 控制字符
+          # -------------------------------------------------
+          def is_bad_control(ch):
+              code = ord(ch)
+
+              if ch in "\t\n\r":
+                  return False
+
+              if 0x00 <= code <= 0x1F:
+                  return True
+
+              if 0x7F <= code <= 0x9F:
+                  return True
+
+              return False
+
+          # -------------------------------------------------
+          # 第一层：清理原始文本中的控制字符
+          # -------------------------------------------------
+          try:
+              raw = src.read_text(
+                  encoding="utf-8",
+                  errors="strict"
+              )
+          except Exception as e:
+              print("文件不是有效 UTF-8：")
+              print(e)
+              sys.exit(1)
+
+          raw_bad_count = sum(
+              1 for ch in raw
+              if is_bad_control(ch)
+          )
+
+          print(
+              f"原始文本控制字符数量："
+              f"{raw_bad_count}"
+          )
+
+          if raw_bad_count > 0:
+              raw = "".join(
+                  ch for ch in raw
+                  if not is_bad_control(ch)
+              )
+
+              print(
+                  f"已清除原始控制字符："
+                  f"{raw_bad_count} 个"
+              )
+
+          # -------------------------------------------------
+          # 第二层：解析 YAML
+          # -------------------------------------------------
+          try:
+              data = yaml.safe_load(raw)
+          except Exception as e:
+              print("")
+              print("YAML 解析失败")
+              print("--------------------")
+              print(e)
+              print("--------------------")
+              print("停止更新，保留仓库中原来的 flclash.yaml")
+              sys.exit(1)
+
+          if not isinstance(data, dict):
+              print("错误：YAML 顶层结构不是字典")
+              sys.exit(1)
+
+          proxies = data.get("proxies")
+          providers = data.get("proxy-providers")
+
+          if not proxies and not providers:
+              print(
+                  "错误：没有找到 proxies "
+                  "或 proxy-providers"
+              )
+              sys.exit(1)
+
+          if isinstance(proxies, list):
+              print(
+                  f"检测到节点数量："
+                  f"{len(proxies)}"
+              )
+
+          # -------------------------------------------------
+          # 第三层：
+          # 清理 YAML 解码以后产生的控制字符
+          #
+          # 例如源内容：
+          # "\x9F\x87"
+          #
+          # PyYAML 解析后会变成真正的控制字符，
+          # 所以必须再清理一次
+          # -------------------------------------------------
+          decoded_bad_count = 0
+
+          def clean_string(value):
+              global decoded_bad_count
+
+              result = []
+
+              for ch in value:
+                  if is_bad_control(ch):
+                      decoded_bad_count += 1
+                      continue
+
+                  result.append(ch)
+
+              return "".join(result)
+
+          def clean_obj(obj):
+
+              if isinstance(obj, dict):
+
+                  result = {}
+
+                  for key, value in obj.items():
+
+                      if isinstance(key, str):
+                          key = clean_string(key)
+
+                      result[key] = clean_obj(value)
+
+                  return result
+
+              if isinstance(obj, list):
+
+                  return [
+                      clean_obj(item)
+                      for item in obj
+                  ]
+
+              if isinstance(obj, str):
+
+                  return clean_string(obj)
+
+              return obj
+
+          data = clean_obj(data)
+
+          print(
+              f"YAML字段内部控制字符数量："
+              f"{decoded_bad_count}"
+          )
+
+          if decoded_bad_count > 0:
+              print(
+                  f"已清除字段内部控制字符："
+                  f"{decoded_bad_count} 个"
+              )
+
+          # -------------------------------------------------
+          # 第四层：重新生成标准 YAML
+          # -------------------------------------------------
+          try:
+              yaml_text = yaml.safe_dump(
+                  data,
+                  allow_unicode=True,
+                  sort_keys=False,
+                  default_flow_style=False,
+                  width=4096
+              )
+          except Exception as e:
+              print("重新生成 YAML 失败：")
+              print(e)
+              sys.exit(1)
+
+          cleaned_file.write_text(
+              yaml_text,
+              encoding="utf-8"
+          )
+
+          # -------------------------------------------------
+          # 第五层：重新解析验证
+          # -------------------------------------------------
+          try:
+              final_data = yaml.safe_load(
+                  cleaned_file.read_text(
+                      encoding="utf-8"
+                  )
+              )
+          except Exception as e:
+              print("")
+              print("清理后的 YAML 仍无法解析")
+              print(e)
+              print("")
+              print(
+                  "停止更新，保留原来的 "
+                  "flclash.yaml"
+              )
+              sys.exit(1)
+
+          # -------------------------------------------------
+          # 第六层：最终扫描
+          # 确认一个控制字符都没有
+          # -------------------------------------------------
+          remaining = []
+
+          def scan(obj, path="root"):
+
+              if isinstance(obj, dict):
+
+                  for key, value in obj.items():
+
+                      if isinstance(key, str):
+                          if any(
+                              is_bad_control(ch)
+                              for ch in key
+                          ):
+                              remaining.append(
+                                  path + ".KEY"
+                              )
+
+                      scan(
+                          value,
+                          f"{path}.{key}"
+                      )
+
+              elif isinstance(obj, list):
+
+                  for i, value in enumerate(obj):
+
+                      scan(
+                          value,
+                          f"{path}[{i}]"
+                      )
+
+              elif isinstance(obj, str):
+
+                  if any(
+                      is_bad_control(ch)
+                      for ch in obj
+                  ):
+                      remaining.append(path)
+
+          scan(final_data)
+
+          if remaining:
+
+              print(
+                  "错误：清理后仍存在控制字符"
+              )
+
+              for item in remaining[:20]:
+                  print(item)
+
+              sys.exit(1)
+
+          print("")
+          print("==============================")
+          print("YAML 校验通过")
+          print("剩余控制字符：0")
+          print("==============================")
+
+          # 最终用清理后的配置替换临时文件
+          cleaned_file.replace(src)
+
+          PY
+
       - name: 更新固定配置文件
         run: |
           mv flclash-temp.yaml flclash.yaml
@@ -76,6 +361,8 @@ jobs:
             echo "时区：北京时间"
             echo "本次来源链接：$SUBSCRIPTION_URL"
             echo "固定订阅地址：https://raw.githubusercontent.com/50lovelace/flclash-nodes/main/flclash.yaml"
+            echo ""
+            echo "更新前已执行 YAML 控制字符清理及格式校验"
           } > update-info.txt
 
       - name: 提交到仓库
